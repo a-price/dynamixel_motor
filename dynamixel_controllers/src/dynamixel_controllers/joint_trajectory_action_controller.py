@@ -99,6 +99,7 @@ class JointTrajectoryActionController():
         self.goal_constraints = []
         self.trajectory_constraints = []
         self.min_velocity = rospy.get_param(self.controller_namespace + '/joint_trajectory_action_node/min_velocity', 0.1)
+        self.fill_missing = rospy.get_param(self.controller_namespace + '/joint_trajectory_action_node/fill_missing', False)
         
         for joint in self.joint_names:
             self.goal_constraints.append(rospy.get_param(ns + '/' + joint + '/goal', -1.0))
@@ -153,6 +154,16 @@ class JointTrajectoryActionController():
             traj = self.converter.convert_trajectory(traj)
 
         num_points = len(traj.points)
+
+        if self.fill_missing:
+            missing_joints = set(self.joint_names) - set(traj.joint_names)
+            missing_positions = [self.joint_states[j].goal_pos for j in missing_joints]
+            missing_velocities = [0.0 for _ in missing_joints]
+
+            traj.joint_names.extend(missing_joints)
+            for i in range(num_points):
+                traj.points[i].positions.extend(missing_positions)
+                traj.points[i].velocities.extend(missing_velocities)
         
         # make sure the joints in the goal match the joints of the controller
         if set(self.joint_names) != set(traj.joint_names):
